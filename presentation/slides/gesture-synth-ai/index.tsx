@@ -1384,44 +1384,43 @@ const Slide6_Instrument: Page = () => {
       <Header
         tag="PART 05 • 실시간 악기 시스템"
         title="손 제스처 음악 변환과 실시간 악기 연동"
-        subtitle="카메라 앞에서 양손 제스처만으로 피아노 화음과 음색을 자유롭게 연주하는 비접촉 신디사이저"
+        subtitle="카메라 앞에서 양손의 제스처만으로 피아노 화음과 음색을 자유롭게 연주하는 비접촉 신디사이저"
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.18fr 1fr', gap: '26px', flex: 1, minHeight: 0 }}>
-        {/* Left Column: Live Performance Execution Screen */}
-        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', padding: '22px 24px', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px', flex: 1, minHeight: 0 }}>
+        {/* Left Hand: Chord Engine */}
+        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', padding: '22px 26px', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={S.badge('#fee2e2', '#dc2626', '#fca5a5')}>🔴 LIVE EXECUTION</span>
-              <h2 style={{ fontSize: '24px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
-                실제 신디사이저 연주 화면
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={S.badge('#eff6ff', '#2563eb', '#bfdbfe')}>LEFT HAND</span>
+              <h2 style={{ fontSize: '25px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                왼손: 피아노 화음(코드) 만들기
               </h2>
             </div>
-            <span style={{ fontSize: '15px', color: '#2563eb', fontWeight: 700 }}>E(V) Dominant 7th (-8ve)</span>
+            <span style={{ fontSize: '15px', color: '#64748b', fontWeight: 700 }}>Chord &amp; Mode</span>
           </div>
 
-          {/* Actual Live Execution Screenshot */}
+          {/* Generated Concept Illustration */}
           <div
             style={{
               borderRadius: '12px',
               overflow: 'hidden',
-              height: '305px',
-              border: '2px solid #0284c7',
-              background: '#040711',
+              height: '215px',
+              border: '1.5px solid #cbd5e1',
+              background: '#090d16',
               position: 'relative',
-              boxShadow: '0 8px 24px -6px rgba(2, 132, 199, 0.25)',
             }}
           >
             <img
-              src={synthLivePlayImg}
-              alt="AuraSynth 실제 연주 화면"
+              src={synthLeftHandImg}
+              alt="왼손 화음 제스처 매핑"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
             <div
               style={{
                 position: 'absolute',
-                top: '10px',
-                left: '12px',
+                bottom: '10px',
+                right: '12px',
                 background: 'rgba(15, 23, 42, 0.85)',
                 color: '#38bdf8',
                 fontSize: '13px',
@@ -1429,132 +1428,213 @@ const Slide6_Instrument: Page = () => {
                 borderRadius: '6px',
                 backdropFilter: 'blur(4px)',
                 fontWeight: 700,
-                border: '1px solid rgba(56, 189, 248, 0.3)',
               }}
             >
-              🎥 웹캠 관절 추적 + 실시간 음향 파형 렌더링
+              🎹 손가락 포즈 인식 ➔ 피아노 화음 매핑
             </div>
+          </div>
+
+          {/* Easy feature descriptions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', flex: 1, justifyContent: 'center' }}>
+            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #2563eb' }}>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                🖐️ 손가락 모양으로 원하는 화음(Chord) 즉시 선택
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '15px', color: '#475569', lineHeight: 1.45 }}>
+                <div>• <strong>손가락 개수 매핑:</strong> 1~5개 펴짐에 따라 C, Dm, Em, F, G 등 기본 피아노 화음 즉각 선택</div>
+                <div>• <strong>직관적 반주:</strong> 건반을 직접 누르지 않고 손가락 포즈만으로 풍성한 코드 연주 가능</div>
+              </div>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #0284c7' }}>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                🔄 손목을 살짝 기울여 밝은 장조 / 슬픈 단조 전환
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '15px', color: '#475569', lineHeight: 1.45 }}>
+                <div>• <strong>손목 기울기 감지:</strong> 좌우 틸트(Tilt) 각도에 따라 메이저(Major) ↔ 마이너(Minor) 실시간 전환</div>
+                <div>• <strong>감정선 표현:</strong> 별도 버튼 없이 손목 각도 조작만으로 곡의 분위기와 무드를 자유롭게 변형</div>
+              </div>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #7c3aed' }}>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                ✨ 화면 하단 네온 텍스트로 현재 연주 코드 실시간 표시
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '15px', color: '#475569', lineHeight: 1.45 }}>
+                <div>• <strong>실시간 시각 피드백:</strong> 연주 중인 코드명(C Major, Am 등)이 화면 하단 네온으로 즉시 디스플레이</div>
+                <div>• <strong>안정적 모니터링:</strong> 현재 잡힌 손가락 모양과 코드 상태를 눈으로 보며 안심하고 연주</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Hand: Voicing & Expression */}
+        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', padding: '22px 26px', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={S.badge('#dcfce7', '#15803d', '#86efac')}>RIGHT HAND</span>
+              <h2 style={{ fontSize: '25px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                오른손: 볼륨(소리 크기)과 음색 조절
+              </h2>
+            </div>
+            <span style={{ fontSize: '15px', color: '#64748b', fontWeight: 700 }}>Volume &amp; Expression</span>
+          </div>
+
+          {/* Generated Concept Illustration */}
+          <div
+            style={{
+              borderRadius: '12px',
+              overflow: 'hidden',
+              height: '215px',
+              border: '1.5px solid #cbd5e1',
+              background: '#090d16',
+              position: 'relative',
+            }}
+          >
+            <img
+              src={synthRightHandImg}
+              alt="오른손 볼륨 및 필터 음색 조절"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
             <div
               style={{
                 position: 'absolute',
                 bottom: '10px',
                 right: '12px',
-                background: 'rgba(15, 23, 42, 0.88)',
+                background: 'rgba(15, 23, 42, 0.85)',
                 color: '#4ade80',
-                fontSize: '12.5px',
+                fontSize: '13px',
                 padding: '4px 10px',
                 borderRadius: '6px',
                 backdropFilter: 'blur(4px)',
                 fontWeight: 700,
               }}
             >
-              ⚡ 30 FPS 실시간 무지연 연주
+              🎛️ 손 높이 볼륨 + 손목 틸트 음색 필터 변형
             </div>
           </div>
 
-          {/* Visual Elements Breakdown Cards */}
+          {/* Easy feature descriptions */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', flex: 1, justifyContent: 'center' }}>
-            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #2563eb' }}>
-              <div style={{ fontSize: '16.5px', fontWeight: 800, color: '#0f172a', marginBottom: '2px' }}>
-                🎹 왼손 화음 결정: <span style={{ color: '#2563eb' }}>E(V)</span>
+            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #16a34a' }}>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                🔊 손을 올리고 내리는 높낮이로 볼륨 조절
               </div>
-              <div style={{ fontSize: '15px', color: '#475569', lineHeight: 1.4 }}>
-                왼손 5개 손가락 전개 감지 ➔ 스케일 5도(V) 메이저 화음(E Major)을 실시간으로 선택 및 발음
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '15px', color: '#475569', lineHeight: 1.45 }}>
+                <div>• <strong>높낮이(Y축) 연동:</strong> 손을 높이 올리면 웅장하고 풍성하게, 내리면 부드럽게 감쇄</div>
+                <div>• <strong>비접촉 다이내믹스:</strong> 하드웨어 노브 없이 허공의 손 높이(Y축)만으로 음량 정밀 제어</div>
               </div>
             </div>
 
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #059669' }}>
-              <div style={{ fontSize: '16.5px', fontWeight: 800, color: '#0f172a', marginBottom: '2px' }}>
-                🎛️ 오른손 표현 레이어: <span style={{ color: '#059669' }}>Dominant 7th (-8ve)</span>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                🎛️ 손목을 기울여 부드러운 피아노 ➔ 날카로운 신스 변신
               </div>
-              <div style={{ fontSize: '15px', color: '#475569', lineHeight: 1.4 }}>
-                오른손 제스처로 7th 텐션 코드를 결합하고, 엄지손가락을 펴서 -1옥타브 베이스음을 동시 연주
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '15px', color: '#475569', lineHeight: 1.45 }}>
+                <div>• <strong>로우패스 필터 개폐:</strong> 안쪽으로 꺾으면 아날로그 피아노 톤, 바깥으로 젖히면 날카로운 전자 신스</div>
+                <div>• <strong>다이내믹 질감 변형:</strong> 연주 도중 손목 각도를 열어 EDM·신스팝 사운드로 즉각 빌드업</div>
               </div>
             </div>
 
-            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #ea580c' }}>
-              <div style={{ fontSize: '16.5px', fontWeight: 800, color: '#0f172a', marginBottom: '2px' }}>
-                🔊 실시간 오디오 파형: <span style={{ color: '#ea580c' }}>오렌지 네온 웨이브폼</span>
+            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '4px solid #d97706' }}>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                🎶 엄지를 펼치면 웅장한 저음 베이스(-1옥타브) 추가
               </div>
-              <div style={{ fontSize: '15px', color: '#475569', lineHeight: 1.4 }}>
-                Web Audio API 오실레이터에서 합성되는 다채로운 오디오 신호를 캔버스 하단에 역동적 파형으로 실시간 시각화
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Left & Right Hand Control Mapping Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Card 1: Left Hand Mapping */}
-          <div style={{ ...S.card, display: 'flex', flexDirection: 'column', padding: '20px 22px', gap: '10px', flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={S.badge('#eff6ff', '#2563eb', '#bfdbfe')}>LEFT HAND</span>
-                <h3 style={{ fontSize: '21px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
-                  왼손: 피아노 화음(코드) 만들기
-                </h3>
-              </div>
-              <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 700 }}>Chord & Mode</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '16px', color: '#334155', lineHeight: 1.45 }}>
-              <div style={{ background: '#f8fafc', padding: '9px 13px', borderRadius: '8px' }}>
-                <strong>• 손가락 개수 매핑:</strong> 1~5개 펴짐에 따라 C, Dm, Em, F, G 등 기본 피아노 화음(스케일 도수) 즉시 선택
-              </div>
-              <div style={{ background: '#f8fafc', padding: '9px 13px', borderRadius: '8px' }}>
-                <strong>• 손목 기울기(틸트):</strong> 안쪽 꺾임 ➔ 메이저(장조), 바깥 꺾임 ➔ 마이너(단조)로 분위기 실시간 전환
-              </div>
-              <div style={{ background: '#f8fafc', padding: '9px 13px', borderRadius: '8px' }}>
-                <strong>• 시각 피드백:</strong> 잡고 있는 화음명(예: E(V))이 화면 하단 네온 텍스트로 즉각 표시되어 안정적 모니터링
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Right Hand Mapping */}
-          <div style={{ ...S.card, display: 'flex', flexDirection: 'column', padding: '20px 22px', gap: '10px', flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={S.badge('#dcfce7', '#15803d', '#86efac')}>RIGHT HAND</span>
-                <h3 style={{ fontSize: '21px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
-                  오른손: 볼륨(소리 크기)과 음색 조절
-                </h3>
-              </div>
-              <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 700 }}>Volume & Expression</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '16px', color: '#334155', lineHeight: 1.45 }}>
-              <div style={{ background: '#f8fafc', padding: '9px 13px', borderRadius: '8px' }}>
-                <strong>• 손 높이(Y축) 볼륨:</strong> 위로 올릴수록 풍성하게 볼륨 증폭, 아래로 내리면 부드럽게 감쇄
-              </div>
-              <div style={{ background: '#f8fafc', padding: '9px 13px', borderRadius: '8px' }}>
-                <strong>• 손목 틸트 필터:</strong> 안쪽 꺾임 ➔ 따뜻한 아날로그 톤, 바깥 젖힘 ➔ 날카로운 전자 신스로 변형
-              </div>
-              <div style={{ background: '#f8fafc', padding: '9px 13px', borderRadius: '8px' }}>
-                <strong>• 엄지 펼침(-1옥타브):</strong> 엄지를 펴는 순간 묵직한 서브 베이스 추가 및 고급 7th 텐션 자동 레이어링
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '15px', color: '#475569', lineHeight: 1.45 }}>
+                <div>• <strong>서브 베이스 레이어:</strong> 엄지손가락을 펴는 순간 묵직한 -1옥타브 근음(Bass)이 함께 울림</div>
+                <div>• <strong>화려한 7th 텐션:</strong> 오른손 손가락 개수에 따라 재즈풍 고급 텐션 코드가 자동으로 레이어링</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Bottom Live Execution Showcase Banner */}
       <div
         style={{
           marginTop: '14px',
           background: '#ffffff',
           border: '1.5px solid #cbd5e1',
-          borderRadius: '12px',
-          padding: '12px 22px',
+          borderRadius: '14px',
+          padding: '12px 20px',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: '16.5px',
-          color: '#334155',
+          gap: '20px',
+          boxShadow: '0 4px 12px -2px rgba(15, 23, 42, 0.05)',
         }}
       >
-        <span>
-          🚀 <strong>원클릭 실행 (.exe):</strong> 프로그램 실행 시 웹캠과 사운드 엔진이 자동 연결되어 누구나 즉시 양손으로 비접촉 악기 연주 가능
-        </span>
-        <span style={S.badge('#eff6ff', '#2563eb', '#bfdbfe')}>양손 인터랙티브 AI 신디사이저</span>
+        {/* Actual Live Execution Screenshot Container */}
+        <div
+          style={{
+            height: '115px',
+            width: '280px',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            border: '2px solid #0284c7',
+            background: '#040711',
+            position: 'relative',
+            flexShrink: 0,
+            boxShadow: '0 4px 14px -3px rgba(2, 132, 199, 0.3)',
+          }}
+        >
+          <img
+            src={synthLivePlayImg}
+            alt="AuraSynth 실제 연주 화면"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '5px',
+              left: '6px',
+              background: 'rgba(15, 23, 42, 0.88)',
+              color: '#38bdf8',
+              fontSize: '11.5px',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              fontWeight: 700,
+              backdropFilter: 'blur(3px)',
+            }}
+          >
+            🔴 LIVE 연주 화면
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: '5px',
+              right: '6px',
+              background: 'rgba(15, 23, 42, 0.88)',
+              color: '#4ade80',
+              fontSize: '11px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontWeight: 700,
+            }}
+          >
+            ⚡ 30 FPS
+          </div>
+        </div>
+
+        {/* Live Execution Details & Controls */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
+                실제 신디사이저 연주 화면: <span style={{ color: '#2563eb' }}>E(V) Dominant 7th (-8ve)</span>
+              </span>
+            </div>
+            <span style={S.badge('#eff6ff', '#2563eb', '#bfdbfe')}>양손 인터랙티브 AI 신디사이저</span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '15px', color: '#475569', lineHeight: 1.45 }}>
+            <div>
+              • <strong>실시간 시각 피드백:</strong> 왼손 5손가락 화음(E)과 오른손 7th 텐션 및 엄지 옥타브(-8ve)가 화면 중앙에 즉시 디스플레이
+            </div>
+            <div>
+              • <strong>오디오 파형 &amp; 원클릭 연주:</strong> 하단 오렌지색 네온 파형으로 실시간 사운드 합성 시각화, 복잡한 설정 없이 .exe 실행만으로 즉시 연주
+            </div>
+          </div>
+        </div>
       </div>
       <Footer />
     </section>
