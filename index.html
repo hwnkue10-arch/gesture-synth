@@ -1,158 +1,326 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Gesture Synth</title>
+<title>AuraSynth - AI 제스처 신디사이저</title>
 
-<script type="text/javascript">
-    (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-    })(window, document, "clarity", "script", "xzz1v75lj8");
-</script>
+<!-- Google Fonts: Outfit (UI) & JetBrains Mono (Audio/Code) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 <style>
+:root {
+  --bg-dark: #07090e;
+  --header-bg: rgba(13, 17, 24, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --accent-cyan: #00f5d4;
+  --accent-gold: #ffbe0b;
+  --accent-magenta: #ff007f;
+  --accent-violet: #8338ec;
+  --text-main: #f0f6fc;
+  --text-muted: #8b949e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 html, body {
   margin: 0;
+  padding: 0;
+  width: 100%;
   height: 100%;
-  background: #111;
+  background: var(--bg-dark);
   overflow: hidden;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text-main);
+  user-select: none;
 }
+
+/* ==================== 1. 메인 무대 (카메라 & 캔버스) ==================== */
 #stage {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100dvh;
+  height: 100vh;
 }
+
 #webcam {
   display: none;
 }
+
 #overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-}
-#helpButton {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 1px solid #e8a13d00;
-  background: rgba(20,20,20,0.85);
-  color: #e8a13d;
-  font-size: 22px;
-  cursor: pointer;
-  z-index: 6;
+  transition: filter 0.4s ease;
 }
 
-#helpModal.hidden {
-  display: none;
+#overlay.dimmed {
+  filter: grayscale(1) brightness(0.35) blur(6px);
 }
 
-#helpModal {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.75);
+/* ==================== 2. 상단 고정 헤더 바 (절대 겹침 방지) ==================== */
+#topBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 58px;
+  background: var(--header-bg);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--panel-border);
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
   z-index: 20;
+  gap: 12px;
 }
 
-.help-content {
-  background: #1a1a1a;
-  color: white;
-  border: 1px solid #e8a13d;
-  border-radius: 10px;
-  width: min(500px, 90vw);
-  max-height: 80vh;
-  overflow-y: auto;
-  padding: 24px;
-  font-family: monospace;
+.nav-left, .nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-#closeHelp {
-  float: right;
-  background: none;
-  border: none;
-  color: #e8a13d;
-  font-size: 20px;
+/* 브랜드 로고 */
+.brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.5; }
+}
+
+.brand-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, #00f5d4 0%, #8338ec 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* 공통 셀렉트 & 버튼 스타일 */
+.glass-select, .glass-btn {
+  background: rgba(22, 27, 36, 0.85);
+  color: var(--text-main);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  height: 36px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.glass-select:hover, .glass-btn:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 245, 212, 0.25);
+}
+
+.glass-select option {
+  background: #11151e;
+  color: #fff;
+}
+
+#modelSelect {
+  border-color: rgba(0, 245, 212, 0.35);
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+/* 마스터 볼륨 컨트롤 박스 */
+.volume-control-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  background: rgba(22, 27, 36, 0.85);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-main);
+  flex-shrink: 0;
+}
+
+.volume-icon {
+  font-size: 13px;
+}
+
+.glass-slider {
+  width: 65px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  outline: none;
   cursor: pointer;
 }
 
-.help-content h2,
-.help-content h3 {
-  color: #e8a13d;
-}
-
-.help-content a {
-  color: #e8a13d;
-  text-decoration: none;
-}
-
-.help-content a:hover {
-  color: #ffbf5c;
-}
-#keySelect {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: #1a1a1a;
-  color: #e8a13d;
-  border: 1px solid #3a3428;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 14px;
-  padding: 4px 8px;
-  z-index: 5;
-}
-#toneSelect {
-  position: absolute;
-  top: 48px;
-  left: 12px;
-  background: #1a1a1a;
-  color: #e8a13d;
-  border: 1px solid #3a3428;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 14px;
-  padding: 4px 8px;
-  z-index: 5;
-}
-
-#guideToggle {
-  position: absolute;
-  top: 90px;
-  left: 12px;
-  background: #1a1a1a;
-  color: #e8a13d;
-  border: 1px solid #3a3428;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 14px;
-  padding: 4px 8px;
+.glass-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 6px var(--accent-cyan);
   cursor: pointer;
-  z-index: 5;
+  transition: transform 0.15s ease;
 }
 
+.glass-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+
+#volumePercentText {
+  min-width: 34px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+/* AI 모델 상태 뱃지 (헤더 내 가로 배치로 절대 겹치지 않음) */
+#modelBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  background: rgba(0, 245, 212, 0.06);
+  border: 1px solid rgba(0, 245, 212, 0.25);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  white-space: nowrap;
+}
+
+/* 스튜디오 오디오 미터 HUD */
+.meter-hud {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+  padding: 0 12px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+#volumeMeter {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+}
+
+.vol-bar {
+  width: 5px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  transition: background 0.08s ease, box-shadow 0.08s ease;
+}
+
+.vol-bar[data-index="0"].lit,
+.vol-bar[data-index="1"].lit { background: #00f5d4; box-shadow: 0 0 6px #00f5d4; }
+.vol-bar[data-index="2"].lit,
+.vol-bar[data-index="3"].lit { background: #52b788; box-shadow: 0 0 6px #52b788; }
+.vol-bar[data-index="4"].lit,
+.vol-bar[data-index="5"].lit { background: #ffbe0b; box-shadow: 0 0 6px #ffbe0b; }
+.vol-bar[data-index="6"].lit { background: #fb5607; box-shadow: 0 0 8px #fb5607; }
+.vol-bar[data-index="7"].lit { background: #ff007f; box-shadow: 0 0 10px #ff007f; }
+
+#distortionDisplay {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  min-width: 65px;
+  text-align: right;
+}
+
+#helpButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: rgba(22, 27, 36, 0.85);
+  color: var(--accent-cyan);
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+#helpButton:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan);
+}
+
+/* ==================== 3. 제스처 가이드 드롭다운 ==================== */
 #gestureGuide {
-  position: absolute;
-  top: 128px;
-  left: 12px;
+  position: fixed;
+  top: 68px;
+  right: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  z-index: 5;
-  font-family: monospace;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(20,20,20,0.85), rgba(20,20,20,0.55));
+  padding: 12px 16px;
+  background: rgba(13, 17, 24, 0.94);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  z-index: 18;
+  transition: all 0.25s ease;
 }
 
 #gestureGuide.hidden {
@@ -162,106 +330,228 @@ html, body {
 .gesture-guide-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.gesture-guide-row:last-child {
+  border-bottom: none;
 }
 
 .gesture-guide-note {
-  width: 28px;
-  color: #e8a13d;
-  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--accent-gold);
+  font-size: 13px;
 }
 
 .gesture-guide-gesture {
-  font-size: 20px;
+  font-size: 16px;
 }
-#chordDisplay {
-  position: absolute;
-  bottom: 35px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: #e8a13d;
-  font-size: 42px;
-  font-family: monospace;
-  font-weight: bold;
-  text-shadow: 0 0 12px rgba(232, 161, 61, 0.6);
-  pointer-events: none;
-}
-#volumeMeter {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+
+/* ==================== 4. 하단 코드 & 상태 HUD (시야 확보) ==================== */
+#bottomBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 64px;
+  background: linear-gradient(to top, rgba(7, 9, 14, 0.92) 0%, rgba(7, 9, 14, 0) 100%);
   display: flex;
-  flex-direction: column-reverse;
-  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 15;
   pointer-events: none;
 }
-.vol-bar {
-  width: 70px;
-  height: 8px;
-  background: #3a3428;
-  border-radius: 2px;
+
+#chordDisplay {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 38px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 16px rgba(0, 245, 212, 0.8), 0 0 32px rgba(131, 56, 236, 0.6);
 }
-.vol-bar.lit {
-  background: #e8a13d;
-}
-/* Add this style rule inside your <style> section */
-#distortionDisplay {
-  position: absolute;
-  top: 105px; /* Sits perfectly below your 8 volume bars */
-  right: 12px;
-  color: #e8a13d;
-  font-family: monospace;
-  font-size: 14px;
-  text-align: right;
-  pointer-events: none;
-}
+
 #qualityDisplay {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: #e8a13d;
-  font-size: 12px;
-  font-family: monospace;
-  pointer-events: none;
+  padding: 4px 14px;
+  background: rgba(18, 23, 32, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--accent-gold);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
 }
-#startOverlay {
-  position: absolute;
+
+/* ==================== 5. 도움말 모달 ==================== */
+#helpModal.hidden {
+  display: none;
+}
+
+#helpModal {
+  position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(5, 7, 10, 0.85);
+  backdrop-filter: blur(16px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 30;
+  padding: 20px;
+}
+
+.help-content {
+  background: #10141d;
+  color: var(--text-main);
+  border: 1px solid rgba(0, 245, 212, 0.3);
+  border-radius: 16px;
+  width: min(640px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px 28px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+}
+
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.help-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #00f5d4, #ffbe0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#closeHelp {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#closeHelp:hover {
+  background: rgba(255, 0, 127, 0.2);
+  color: var(--accent-magenta);
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.help-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.help-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 15px;
+  color: var(--accent-cyan);
+}
+
+.help-card p {
+  margin: 6px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #c9d1d9;
+}
+
+.help-card b {
+  color: #fff;
+  font-size: 11.5px;
+}
+
+/* ==================== 6. 시작 오버레이 ==================== */
+#startOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 10, 0.75);
+  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  padding-bottom: 10vh;
-  gap: 16px;
+  justify-content: center;
+  gap: 20px;
   cursor: pointer;
-  z-index: 10;
-  box-sizing: border-box;
+  z-index: 999;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#startOverlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.start-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 36px 48px;
+  background: rgba(18, 23, 32, 0.95);
+  border: 2px solid var(--accent-cyan);
+  border-radius: 20px;
+  box-shadow: 0 0 40px rgba(0, 245, 212, 0.35), 0 20px 60px rgba(0, 0, 0, 0.8);
+  transform: scale(1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.start-card:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 50px rgba(0, 245, 212, 0.5), 0 20px 60px rgba(0, 0, 0, 0.9);
 }
 
 .start-circle {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--accent-cyan);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  color: #111;
+  font-size: 32px;
+  color: #090c10;
+  padding-left: 5px;
+  box-shadow: 0 0 20px var(--accent-cyan);
 }
 
 .start-text {
   color: #fff;
-  font-family: monospace;
-  font-size: 16px;
-  letter-spacing: 0.05em;
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
   text-align: center;
+  letter-spacing: 0.04em;
 }
 
-#overlay.dimmed {
-  filter: grayscale(1) brightness(0.6);
+.start-subtext {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-cyan);
+  margin-top: 6px;
 }
 </style>
 </head>
@@ -269,108 +559,150 @@ html, body {
 <div id="stage">
   <video id="webcam" autoplay playsinline muted></video>
   <canvas id="overlay" class="dimmed"></canvas>
-  <div id="chordDisplay">--</div>
-  <div id="volumeMeter">
-    <div class="vol-bar" data-index="7"></div>
-    <div class="vol-bar" data-index="6"></div>
-    <div class="vol-bar" data-index="5"></div>
-    <div class="vol-bar" data-index="4"></div>
-    <div class="vol-bar" data-index="3"></div>
-    <div class="vol-bar" data-index="2"></div>
-    <div class="vol-bar" data-index="1"></div>
-    <div class="vol-bar" data-index="0"></div>
-  </div>
-  <select id="keySelect">
-  <option value="220.00" data-note="A" selected>A</option>
-  <option value="233.08" data-note="Bb">A#/Bb</option>
-  <option value="246.94" data-note="B">B</option>
-  <option value="261.63" data-note="C">C</option>
-  <option value="277.18" data-note="Db">C#/Db</option>
-  <option value="293.66" data-note="D">D</option>
-  <option value="311.13" data-note="Eb">D#/Eb</option>
-  <option value="329.63" data-note="E">E</option>
-  <option value="349.23" data-note="F">F</option>
-  <option value="369.99" data-note="Gb">F#/Gb</option>
-  <option value="392.00" data-note="G">G</option>
-  <option value="415.30" data-note="Ab">G#/Ab</option>
-</select>
 
-<select id="toneSelect">
-  <option value="triangle" selected>Warm Synth</option>
-  <option value="sawtooth">Bright Synth</option>
-  <option value="square">Retro Synth</option>
-</select>
-<button id="guideToggle">Open Guide</button>
-<div id="gestureGuide" class="hidden"></div>
-  <div id="qualityDisplay">--</div>
-  <div id="distortionDisplay">Filter: 0%</div>
+  <!-- 상단 전용 네비게이션 헤더 바 (절대 겹치지 않음) -->
+  <header id="topBar">
+    <div class="nav-left">
+      <div class="brand-badge">
+        <div class="brand-dot"></div>
+        <span class="brand-title">AURASYNTH</span>
+      </div>
 
-  <button id="helpButton">?</button>
+      <div class="nav-divider"></div>
 
+      <select id="modelSelect" class="glass-select">
+        <option value="mediapipe" selected>🌟 Google MediaPipe (기본/고정밀)</option>
+        <option value="openvino">🧪 Intel Geti (OpenVINO 실험용)</option>
+        <option value="onnx">🚀 커스텀 YOLOv8-Pose (1.8만 장 학습 모델)</option>
+      </select>
+
+      <div id="modelBadge">AI 모델: 🌟 Google MediaPipe (표준)</div>
+    </div>
+
+    <div class="nav-right">
+      <select id="keySelect" class="glass-select">
+        <option value="220.00" data-note="A" selected>Key: A</option>
+        <option value="233.08" data-note="Bb">Key: A#/Bb</option>
+        <option value="246.94" data-note="B">Key: B</option>
+        <option value="261.63" data-note="C">Key: C</option>
+        <option value="277.18" data-note="Db">Key: C#/Db</option>
+        <option value="293.66" data-note="D">Key: D</option>
+        <option value="311.13" data-note="Eb">Key: D#/Eb</option>
+        <option value="329.63" data-note="E">Key: E</option>
+        <option value="349.23" data-note="F">Key: F</option>
+        <option value="369.99" data-note="Gb">Key: F#/Gb</option>
+        <option value="392.00" data-note="G">Key: G</option>
+        <option value="415.30" data-note="Ab">Key: G#/Ab</option>
+      </select>
+
+      <select id="toneSelect" class="glass-select">
+        <option value="triangle" selected>따뜻한 신스 (Warm)</option>
+        <option value="sawtooth">밝은 신스 (Bright)</option>
+        <option value="square">레트로 신스 (Retro)</option>
+      </select>
+
+      <button id="guideToggle" class="glass-btn">가이드</button>
+
+      <div class="volume-control-box" title="마스터 볼륨 (기본: 100%)">
+        <span class="volume-icon">🔊</span>
+        <input type="range" id="masterVolumeSlider" min="0" max="150" value="100" class="glass-slider">
+        <span id="volumePercentText">100%</span>
+      </div>
+
+      <div class="meter-hud">
+        <div id="volumeMeter">
+          <div class="vol-bar" data-index="7"></div>
+          <div class="vol-bar" data-index="6"></div>
+          <div class="vol-bar" data-index="5"></div>
+          <div class="vol-bar" data-index="4"></div>
+          <div class="vol-bar" data-index="3"></div>
+          <div class="vol-bar" data-index="2"></div>
+          <div class="vol-bar" data-index="1"></div>
+          <div class="vol-bar" data-index="0"></div>
+        </div>
+        <div id="distortionDisplay">필터: 0%</div>
+      </div>
+
+      <button id="helpButton" title="도움말">?</button>
+    </div>
+  </header>
+
+  <!-- 가이드 드롭다운 패널 -->
+  <div id="gestureGuide" class="hidden"></div>
+
+  <!-- 하단 코드 및 퀄리티 HUD 바 (시야 개방) -->
+  <footer id="bottomBar">
+    <div id="chordDisplay">--</div>
+    <div id="qualityDisplay">--</div>
+  </footer>
+
+  <!-- 가이드 모달 -->
   <div id="helpModal" class="hidden">
     <div class="help-content">
-      <button id="closeHelp">✕</button>
-
-      <h2>Gesture Synth Guide</h2>
-      <p>
-      Gesture Synth is an interactive musical instrument created by <a href="https://indecisiveeric.com">
-      Eric Wei</a>.
-      Use your hands to create chords, melodies, and sounds in real-time!
-      
+      <div class="help-header">
+        <h2>AuraSynth 연주 가이드</h2>
+        <button id="closeHelp">✕</button>
+      </div>
+      <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 0;">
+        웹캠 앞에서 손동작으로 코드, 보이싱, 볼륨 및 필터를 실시간으로 연주하는 AI 제스처 신디사이저입니다.
       </p>
 
-      
+      <div class="help-grid">
+        <div class="help-card">
+          <h3>✋ 왼손 (코드 & 모드)</h3>
+          <p><b>손목 기울기</b><br>
+          안쪽으로 기울임 → Major (장조)<br>
+          바깥쪽으로 기울임 → Minor (단조)</p>
 
-      <h3>Left Hand</h3>
-      <p><b>Tilt</b><br>
-      Inward → Major<br>
-      Outward → Minor</p>
+          <p><b>손가락 개수 (스케일 도수)</b><br>
+          1개 → I도 (Tonic)<br>
+          2개 → II도<br>
+          3개 → III도<br>
+          4개 → IV도<br>
+          5개 → V도<br>
+          검지 + 새끼 → VI도<br>
+          엄지 + 검지 + 새끼 → VII도</p>
+        </div>
 
-      <p><b>Fingers (Scale Degree)</b><br>
-      1 → I<br>
-      2 → II<br>
-      3 → III<br>
-      4 → IV<br>
-      5 → V<br>
-      Index + Pinky → VI<br>
-      Index + Pinky + Thumb → VII</p>
+        <div class="help-card">
+          <h3>🤚 오른손 (보이싱 & 표현)</h3>
+          <p><b>손가락 개수 (화음 형태)</b><br>
+          1개 → Root Position (기본위치)<br>
+          2개 → 1st Inversion (1전위)<br>
+          3개 → Major / Minor 7th<br>
+          4개 → Dominant / Diminished 7th</p>
 
-      <h3>Right Hand</h3>
-      <p><b>Fingers (Chord Quality)</b><br>
-      1 → Root Position<br>
-      2 → 1st Inversion<br>
-      3 → Major/Minor 7th<br>
-      4 → Dominant/Diminished 7th</p>
+          <p><b>옥타브 시프트</b><br>
+          엄지 접음 → 기본 옥타브<br>
+          엄지 폄 → 1옥타브 낮춤 (-8ve)</p>
 
-      <p><b>Octave</b><br>
-      Thumb In → higher octave<br>
-      Thumb Out → lower octave</p>
+          <p><b>손목 기울기 (필터)</b><br>
+          안쪽 → 부드럽고 따뜻한 톤<br>
+          바깥쪽 → 날카롭고 밝은 톤</p>
 
-      <p><b>Tilt</b><br>
-      Inward → More Filter<br>
-      Outward → Less Filter</p>
+          <p><b>손 높이 (볼륨)</b><br>
+          올릴수록 소리 커짐 (볼륨 ↑)<br>
+          내릴수록 소리 작아짐 (볼륨 ↓)</p>
+      </div>
 
-      <p><b>Height</b><br>
-      Higher → Louder<br>
-      Lower → Softer</p>
-
-      <a href="https://www.instagram.com/p/DbH1BACxNCG/" target="_blank" rel="noopener noreferrer">
-        📹 Gesture Synth tutorial by Eric Wei on Instagram
-      </a>
-
+      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: var(--text-muted); text-align: center;">
+        Based on Gesture Synth by Eric Wei | Extended with Multi-Model AI Architecture
+      </div>
     </div>
   </div>
 
+  <!-- 시작 오버레이 -->
   <div id="startOverlay">
-    <div class="start-circle">▶</div>
-    <div class="start-text">
-    click to enable audio
-    <br>
-    <br>
-    <small>Created by Eric Wei 🙌</small>
-  </div>
+    <div class="start-card">
+      <div class="start-circle">▶</div>
+      <div class="start-text">
+        클릭하여 신디사이저 시작
+        <div class="start-subtext">오디오 및 카메라 활성화</div>
+      </div>
+    </div>
   </div>
 </div>
+
 <script type="module" src="/main.js"></script>
 </body>
 </html>

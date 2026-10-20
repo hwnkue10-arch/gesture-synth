@@ -18,6 +18,118 @@ function trackClarityEvent(eventName) {
   }
 }
 
+const modelSelectEl = document.getElementById("modelSelect");
+const modelBadgeEl = document.getElementById("modelBadge");
+let currentModelType = "mediapipe"; // "mediapipe" | "openvino" | "onnx"
+
+// 마스터 볼륨 배율 (기본 1.0 = 기존 상태 100%)
+let masterVolumeFactor = 1.0;
+const masterVolumeSlider = document.getElementById("masterVolumeSlider");
+const volumePercentText = document.getElementById("volumePercentText");
+
+if (masterVolumeSlider) {
+  masterVolumeSlider.addEventListener("input", (e) => {
+    const val = Number(e.target.value);
+    masterVolumeFactor = val / 100;
+    if (volumePercentText) {
+      volumePercentText.textContent = `${val}%`;
+    }
+  });
+}
+
+// 외부 모델(OpenVINO / ONNX 브릿지) 키포인트 버퍼
+let externalModelResults = {
+  landmarks: [],
+  handedness: []
+};
+let isBridgeConnected = false;
+let bridgeSocket = null;
+let isFrameSending = false;
+
+// 파이썬 브릿지로 보낼 오프스크린 캡처 캔버스
+const captureCanvas = document.createElement("canvas");
+captureCanvas.width = 384;
+captureCanvas.height = 384;
+const captureCtx = captureCanvas.getContext("2d");
+
+function sendFrameToBridge() {
+  if (!isBridgeConnected || !bridgeSocket || bridgeSocket.readyState !== WebSocket.OPEN || isFrameSending) {
+    return;
+  }
+  if (!videoEl || videoEl.readyState < 2) return;
+
+  isFrameSending = true;
+  captureCtx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
+  const dataUrl = captureCanvas.toDataURL("image/jpeg", 0.6);
+  try {
+    bridgeSocket.send(JSON.stringify({
+      model: currentModelType,
+      image: dataUrl
+    }));
+  } catch (err) {
+    isFrameSending = false;
+  }
+}
+
+function initBridgeWebSocket() {
+  try {
+    bridgeSocket = new WebSocket("ws://localhost:8765");
+    bridgeSocket.onopen = () => {
+      isBridgeConnected = true;
+      console.log("[AI Bridge] OpenVINO/ONNX 브릿지 연결 완료");
+      updateModelBadge(currentModelType);
+    };
+    bridgeSocket.onmessage = (event) => {
+      isFrameSending = false;
+      try {
+        const data = JSON.parse(event.data);
+        if (data && data.landmarks) {
+          externalModelResults = data;
+        }
+      } catch (e) {}
+    };
+    bridgeSocket.onclose = () => {
+      isBridgeConnected = false;
+      isFrameSending = false;
+      setTimeout(initBridgeWebSocket, 2000); // 자동 재연결
+    };
+    bridgeSocket.onerror = () => {
+      isBridgeConnected = false;
+      isFrameSending = false;
+    };
+  } catch (e) {}
+}
+initBridgeWebSocket();
+
+function updateModelBadge(modelType) {
+  if (!modelBadgeEl) return;
+  if (modelType === "mediapipe") {
+    modelBadgeEl.textContent = "AI: 🌟 MediaPipe (고정밀)";
+    modelBadgeEl.style.borderColor = "rgba(0, 245, 212, 0.35)";
+    modelBadgeEl.style.color = "#00f5d4";
+    modelBadgeEl.style.background = "rgba(0, 245, 212, 0.08)";
+  } else if (modelType === "openvino") {
+    const statusText = isBridgeConnected ? "연결됨 🟢" : "로딩 중... ⏳";
+    modelBadgeEl.textContent = `AI: 🧪 OpenVINO [${statusText}]`;
+    modelBadgeEl.style.borderColor = isBridgeConnected ? "rgba(0, 245, 212, 0.5)" : "rgba(255, 190, 11, 0.5)";
+    modelBadgeEl.style.color = isBridgeConnected ? "#00f5d4" : "#ffbe0b";
+    modelBadgeEl.style.background = isBridgeConnected ? "rgba(0, 245, 212, 0.08)" : "rgba(255, 190, 11, 0.08)";
+  } else if (modelType === "onnx") {
+    const statusText = isBridgeConnected ? "연결됨 🟢" : "로딩 중... ⏳";
+    modelBadgeEl.textContent = `AI: 🚀 커스텀 YOLOv8 [${statusText}]`;
+    modelBadgeEl.style.borderColor = isBridgeConnected ? "rgba(131, 56, 236, 0.5)" : "rgba(255, 190, 11, 0.5)";
+    modelBadgeEl.style.color = isBridgeConnected ? "#a78bfa" : "#ffbe0b";
+    modelBadgeEl.style.background = isBridgeConnected ? "rgba(131, 56, 236, 0.08)" : "rgba(255, 190, 11, 0.08)";
+  }
+}
+
+if (modelSelectEl) {
+  modelSelectEl.addEventListener("change", (e) => {
+    currentModelType = e.target.value;
+    updateModelBadge(currentModelType);
+  });
+}
+
 // NEW
 const helpButton = document.getElementById("helpButton");
 const helpModal = document.getElementById("helpModal");
@@ -158,15 +270,15 @@ function drawEnergy(ctx, volume01, qualityIndex, tiltFactor, chordStr) {
       isMajor = (chordStr === upperStr);
 
       const SCALE_COLORS = {
-        "I":   "232, 161, 61",  // Tonic: Golden Sunset
-        "II":  "210, 50, 120",  // 2nd: Purple-Red
-        "III": "180, 40, 150",  // 3rd: Deep Violet/Magenta alternative
-        "IV":  "240, 210, 40",  // 4th: Yellow
-        "V":   "245, 120, 30",  // 5th: Orange
-        "VI":  "230, 40, 40",    // 6th: Red
-        "VII": "100, 200, 250"   // 7th: Cyan
+        "I":   "0, 245, 212",   // Tonic: Cyber Neon Cyan
+        "II":  "131, 56, 236",  // 2nd: Vivid Violet
+        "III": "255, 0, 127",   // 3rd: Electric Magenta
+        "IV":  "255, 190, 11",  // 4th: Radiant Amber Gold
+        "V":   "251, 86, 7",    // 5th: Hyper Orange
+        "VI":  "255, 77, 109",  // 6th: Coral Pink
+        "VII": "58, 134, 255"   // 7th: Deep Sky Blue
       };
-      baseColorRGB = SCALE_COLORS[upperStr] || "232, 161, 61";
+      baseColorRGB = SCALE_COLORS[upperStr] || "0, 245, 212";
     }
 
 
@@ -684,11 +796,28 @@ const synth = new SynthEngine();
 let hasPlayedFirstSound = false;
 let lastTrackedChord = null;
 
-startOverlayEl.addEventListener("click", () => {
+function activateAudioAndVisuals() {
   synth.ensureContext();
-  startOverlayEl.style.display = "none";
-  canvasEl.classList.remove("dimmed");
-});
+  if (synth.ctx && synth.ctx.state === "suspended") {
+    synth.ctx.resume();
+  }
+  if (startOverlayEl) {
+    startOverlayEl.classList.add("hidden");
+    startOverlayEl.style.display = "none";
+  }
+  if (canvasEl) {
+    canvasEl.classList.remove("dimmed");
+  }
+}
+
+if (startOverlayEl) {
+  startOverlayEl.addEventListener("click", activateAudioAndVisuals);
+}
+
+// 화면 어디를 누르든 최초 1회 즉시 오디오 & 비디오 선명화 자동 활성화
+window.addEventListener("click", () => {
+  activateAudioAndVisuals();
+}, { once: true });
 
 guideToggleEl.addEventListener("click", () => {
   const isHidden = gestureGuideEl.classList.toggle("hidden");
@@ -697,7 +826,7 @@ guideToggleEl.addEventListener("click", () => {
     trackClarityEvent("guide_opened");
   }
 
-  guideToggleEl.textContent = isHidden ? "Open Guide" : "Close Guide";
+  guideToggleEl.textContent = isHidden ? "가이드" : "닫기";
 });
 
 helpButton.addEventListener("click", () => {
@@ -749,7 +878,6 @@ function drawFrame(results, canvasWidth, canvasHeight) {
 
   ctx.drawImage(videoEl, sx, sy, sWidth, sHeight, 0, 0, canvasWidth, canvasHeight);
 
-  ctx.fillStyle = "#ffffff80";
   for (const landmarks of results.landmarks) {
     for (const point of landmarks) {
       const videoPx = point.x * srcW;
@@ -757,8 +885,16 @@ function drawFrame(results, canvasWidth, canvasHeight) {
       const canvasX = ((videoPx - sx) / sWidth) * canvasWidth;
       const canvasY = ((videoPy - sy) / sHeight) * canvasHeight;
 
+      // Outer glow
       ctx.beginPath();
-      ctx.arc(canvasX, canvasY, 4, 0, Math.PI * 2);
+      ctx.arc(canvasX, canvasY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 245, 212, 0.4)";
+      ctx.fill();
+
+      // Center core
+      ctx.beginPath();
+      ctx.arc(canvasX, canvasY, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
       ctx.fill();
     }
   }
@@ -794,7 +930,16 @@ async function main() {
   if (videoEl.currentTime !== lastVideoTime) {
     lastVideoTime = videoEl.currentTime;
 
-    const results = handLandmarker.detectForVideo(videoEl, timestampNow);
+    let results = { landmarks: [], handedness: [] };
+
+    if (currentModelType === "mediapipe") {
+      // ★ 1. Google MediaPipe (기본/고정밀 - 원본 로직 100% 보존)
+      results = handLandmarker.detectForVideo(videoEl, timestampNow);
+    } else {
+      // 🧪 2. Intel Geti (OpenVINO) / 커스텀 ONNX 모델 결과 주입
+      sendFrameToBridge();
+      results = externalModelResults;
+    }
 
     drawFrame(
       results,
@@ -805,17 +950,20 @@ async function main() {
     cachedLeftLandmarks = null;
     cachedRightLandmarks = null;
 
-    results.landmarks.forEach((landmarks, i) => {
-      const handedness = results.handedness[i][0].categoryName;
+    if (results && results.landmarks) {
+      results.landmarks.forEach((landmarks, i) => {
+        const handInfo = results.handedness && results.handedness[i] ? results.handedness[i][0] : null;
+        const handedness = handInfo ? handInfo.categoryName : (i === 0 ? "Left" : "Right");
 
-      if (handedness === "Left") {
-        cachedLeftLandmarks = landmarks;
-      }
+        if (handedness === "Left") {
+          cachedLeftLandmarks = landmarks;
+        }
 
-      if (handedness === "Right") {
-        cachedRightLandmarks = landmarks;
-      }
-    });
+        if (handedness === "Right") {
+          cachedRightLandmarks = landmarks;
+        }
+      });
+    }
   }
 
 
@@ -1018,7 +1166,7 @@ if (rawChord) {
     if (targetEl) {
 
       targetEl.textContent =
-        `Filter: ${tiltPercentage > 0 ? "+" : ""}${tiltPercentage}%`;
+        `필터: ${tiltPercentage > 0 ? "+" : ""}${tiltPercentage}%`;
 
     }
 
@@ -1066,7 +1214,7 @@ if (rawChord) {
 
       synth.playNotes(notes);
       synth.setVolume(
-        currentVolume
+        currentVolume * masterVolumeFactor
       );
 
 
