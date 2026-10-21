@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:bridge": "python -m PyInstaller --clean --noconfirm --onedir --distpath bridge_dist --name bridge --collect-all openvino bridge_openvino.py",
     "preview": "vite preview",
     "electron:dev": "vite build && electron .",
     "dist": "vite build && electron-builder"
@@ -36,6 +37,13 @@
     ],
     "extraResources": [
       "bridge_openvino.py",
+      {
+        "from": "bridge_dist/bridge",
+        "to": "bridge",
+        "filter": [
+          "**/*"
+        ]
+      },
       "models/**/*"
     ],
     "win": {

@@ -1,17 +1,27 @@
 # Build & Release outputs
-node_modules
-**/node_modules
-dist
-**/dist
-release
-**/release
+node_modules/
+dist/
+release/
+bridge_dist/
+build/
+*.spec
 .vercel
 
-# Python Cache
-__pycache__
-*.pyc
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+.venv/
+env/
+venv/
+ENV/
 
-# Environment & OS
-.env
+# IDE & OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+Desktop.ini
+.env
+.env.local

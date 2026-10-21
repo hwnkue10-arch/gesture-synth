@@ -21,9 +21,41 @@ except ImportError:
     print("[!] 필수 패키지가 없습니다. (pip install openvino websockets)")
     sys.exit(1)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_XML = os.path.join(BASE_DIR, "models", "openvino", "model.xml")
-MODEL_ONNX = os.path.join(BASE_DIR, "models", "onnx", "model.onnx")
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(line_buffering=True)
+
+def get_model_path(relative_path):
+    candidates = []
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(sys.executable)
+        meipass = getattr(sys, '_MEIPASS', exe_dir)
+        candidates.extend([
+            exe_dir,
+            os.path.join(exe_dir, ".."),
+            os.path.join(exe_dir, "..", ".."),
+            os.path.join(exe_dir, "resources"),
+            os.path.join(exe_dir, "..", "resources"),
+            os.path.join(exe_dir, "..", "..", "resources"),
+            meipass,
+            os.getcwd()
+        ])
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates.extend([base_dir, os.getcwd(), os.path.join(base_dir, "..")])
+
+    for c in candidates:
+        full = os.path.normpath(os.path.join(c, relative_path))
+        if os.path.exists(full):
+            print(f"[ModelPath] 모델 파일 로드 성공: {full}", flush=True)
+            return full
+    fallback = os.path.normpath(os.path.join(candidates[0], relative_path))
+    print(f"[ModelPath] 모델 경로 기본 폴백: {fallback}", flush=True)
+    return fallback
+
+MODEL_XML = get_model_path(os.path.join("models", "openvino", "model.xml"))
+MODEL_ONNX = get_model_path(os.path.join("models", "onnx", "model.onnx"))
 
 core = ov.Core()
 
@@ -72,14 +104,17 @@ GETI_TO_MEDIAPIPE = [
     9   # 20: PINKY_TIP
 ]
 
+GETI_MEAN = np.array([123.675, 116.28, 103.53], dtype=np.float32)
+GETI_SCALE = np.array([58.395, 57.12, 57.375], dtype=np.float32)
+
 def infer_openvino_crop(crop_img, x_offset_ratio, x_scale_ratio):
     """OpenVINO RTMPose 크롭 영역 추론"""
     if compiled_openvino is None:
         return []
     resized = cv2.resize(crop_img, (512, 512))
-    rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
-    tensor = np.transpose(rgb, (2, 0, 1)).astype(np.float32)
-    tensor = np.expand_dims(tensor, axis=0)
+    rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB).astype(np.float32)
+    norm = (rgb - GETI_MEAN) / GETI_SCALE
+    tensor = np.transpose(norm, (2, 0, 1))[np.newaxis, ...]
 
     res = compiled_openvino([tensor])
     pred_x = res[output_x]
@@ -100,20 +135,27 @@ def infer_openvino_crop(crop_img, x_offset_ratio, x_scale_ratio):
     return landmarks
 
 def infer_openvino_dual(frame):
-    """화면을 좌(0~60%)와 우(40~100%)로 분할하여 양손 추론"""
+    """카메라 화면 분할 추론 (카메라 우측=사용자 왼손 코드화음, 카메라 좌측=사용자 오른손 표현제어)"""
     h, w = frame.shape[:2]
-    left_crop = frame[:, :int(w * 0.6)]
-    right_crop = frame[:, int(w * 0.4):]
+    right_user_crop = frame[:, :int(w * 0.65)]
+    left_user_crop = frame[:, int(w * 0.35):]
 
-    left_lm = infer_openvino_crop(left_crop, x_offset_ratio=0.0, x_scale_ratio=0.6)
-    right_lm = infer_openvino_crop(right_crop, x_offset_ratio=0.4, x_scale_ratio=0.6)
+    right_hand_lm = infer_openvino_crop(right_user_crop, x_offset_ratio=0.0, x_scale_ratio=0.65)
+    left_hand_lm = infer_openvino_crop(left_user_crop, x_offset_ratio=0.35, x_scale_ratio=0.65)
+
+    valid_lms = []
+    valid_handedness = []
+
+    if len(left_hand_lm) == 21:
+        valid_lms.append(left_hand_lm)
+        valid_handedness.append([{"categoryName": "Left"}])
+    if len(right_hand_lm) == 21:
+        valid_lms.append(right_hand_lm)
+        valid_handedness.append([{"categoryName": "Right"}])
 
     return {
-        "landmarks": [left_lm, right_lm],
-        "handedness": [
-            [{"categoryName": "Left"}],
-            [{"categoryName": "Right"}]
-        ]
+        "landmarks": valid_lms,
+        "handedness": valid_handedness
     }
 
 # ========================================================
@@ -146,8 +188,8 @@ def infer_yolo_onnx(frame):
     out = compiled_yolo([inp])[yolo_output_key]
     pred = out[0].T  # [8400, 68]
 
-    # 신뢰도 0.35 이상인 후보 검출
-    mask = pred[:, 4] > 0.35
+    # 신뢰도 임계값 0.25 (민감도 및 응답성 향상)
+    mask = pred[:, 4] > 0.25
     filtered = pred[mask]
     if len(filtered) == 0:
         return {"landmarks": [], "handedness": []}
@@ -162,7 +204,7 @@ def infer_yolo_onnx(frame):
         scores.append(float(row[4]))
         kpts_list.append(row[5:].reshape(21, 3))
 
-    idxs = cv2.dnn.NMSBoxes(boxes, scores, score_threshold=0.35, nms_threshold=0.45)
+    idxs = cv2.dnn.NMSBoxes(boxes, scores, score_threshold=0.25, nms_threshold=0.45)
     if len(idxs) == 0:
         return {"landmarks": [], "handedness": []}
 
@@ -182,21 +224,21 @@ def infer_yolo_onnx(frame):
         ]
         hands.append({"cx": cx, "landmarks": lm})
 
-    # 화면 x 좌표 기준으로 정렬 (왼쪽 손 vs 오른쪽 손)
+    # 카메라 x 좌표 기준으로 정렬 (작은 x: 카메라 좌측 = 사용자 오른손, 큰 x: 카메라 우측 = 사용자 왼손)
     hands.sort(key=lambda item: item["cx"])
 
     if len(hands) == 1:
         h0 = hands[0]
-        tag = "Left" if h0["cx"] < 0.5 else "Right"
+        tag = "Left" if h0["cx"] >= 0.5 else "Right"
         return {
             "landmarks": [h0["landmarks"]],
             "handedness": [[{"categoryName": tag}]]
         }
     else:
-        left_h = hands[0]
-        right_h = hands[-1]
+        right_user_hand = hands[0]   # 카메라 좌측
+        left_user_hand = hands[-1]   # 카메라 우측
         return {
-            "landmarks": [left_h["landmarks"], right_h["landmarks"]],
+            "landmarks": [left_user_hand["landmarks"], right_user_hand["landmarks"]],
             "handedness": [
                 [{"categoryName": "Left"}],
                 [{"categoryName": "Right"}]

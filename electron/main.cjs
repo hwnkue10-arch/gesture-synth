@@ -5,6 +5,24 @@ const { spawn } = require('child_process');
 
 let pythonProcess = null;
 
+function getBridgeExePath() {
+  const possiblePaths = [
+    path.join(process.resourcesPath, 'bridge/bridge.exe'),
+    path.join(process.resourcesPath, 'bridge.exe'),
+    path.join(path.dirname(process.execPath), 'resources/bridge/bridge.exe'),
+    path.join(path.dirname(process.execPath), 'resources/bridge.exe'),
+    path.join(path.dirname(process.execPath), 'bridge/bridge.exe'),
+    path.join(path.dirname(process.execPath), 'bridge.exe'),
+    path.join(__dirname, '../bridge_dist/bridge/bridge.exe'),
+    path.join(__dirname, '../dist/bridge/bridge.exe'),
+    path.join(__dirname, '../bridge/bridge.exe'),
+    path.join(process.cwd(), 'bridge_dist/bridge/bridge.exe'),
+    path.join(process.cwd(), 'dist/bridge/bridge.exe'),
+    path.join(process.cwd(), 'bridge.exe')
+  ];
+  return possiblePaths.find(p => p && fs.existsSync(p));
+}
+
 function getBridgeScriptPath() {
   const possiblePaths = [
     path.join(__dirname, '../bridge_openvino.py'),
@@ -17,6 +35,41 @@ function getBridgeScriptPath() {
 }
 
 function startPythonBridge() {
+  const exePath = getBridgeExePath();
+  if (exePath) {
+    console.log(`[Bridge] 독립 실행 바이너리 실행: ${exePath}`);
+    const exeDir = path.dirname(exePath);
+    try {
+      const proc = spawn(exePath, [], {
+        cwd: exeDir,
+        windowsHide: true,
+        stdio: 'pipe'
+      });
+
+      proc.on('error', (err) => {
+        console.error('[Bridge Exe Err]:', err.message);
+      });
+
+      proc.stdout.on('data', (data) => {
+        console.log(`[Bridge Log] ${data.toString().trim()}`);
+      });
+
+      proc.stderr.on('data', (data) => {
+        console.error(`[Bridge Err] ${data.toString().trim()}`);
+      });
+
+      proc.on('close', (code) => {
+        console.log(`[Bridge] 종료됨 (code: ${code})`);
+        pythonProcess = null;
+      });
+
+      pythonProcess = proc;
+      return;
+    } catch (err) {
+      console.error('[Bridge Exe] 구동 실패:', err.message);
+    }
+  }
+
   const scriptPath = getBridgeScriptPath();
   if (!scriptPath) {
     console.log('[Bridge] bridge_openvino.py 파일을 찾을 수 없어 건너뜁니다.');
@@ -98,18 +151,25 @@ function createWindow() {
     },
   });
 
-  // 웹캠 및 오디오 권한 자동 승인
+  // 웹캠, 마이크 및 미디어 권한 무조건 완전 자동 승인
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowed = ['media', 'camera', 'microphone'];
-    if (allowed.includes(permission)) {
-      callback(true);
-    } else {
-      callback(false);
-    }
+    callback(true);
   });
 
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
-    return ['media', 'camera', 'microphone'].includes(permission);
+    return true;
+  });
+
+  // 렌더러(웹) 콘솔 로그를 터미널로 전달
+  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Web Console] ${message}`);
+  });
+
+  // F12 키로 개발자 도구(DevTools) 토글 지원
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12') {
+      win.webContents.toggleDevTools();
+    }
   });
 
   // 개발 모드 플래그 확인

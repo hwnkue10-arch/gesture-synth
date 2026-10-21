@@ -46,21 +46,40 @@ let isBridgeConnected = false;
 let bridgeSocket = null;
 let isFrameSending = false;
 
-// 파이썬 브릿지로 보낼 오프스크린 캡처 캔버스
+// 파이썬 브릿지로 보낼 오프스크린 캡처 캔버스 (카메라 종횡비 유지)
 const captureCanvas = document.createElement("canvas");
-captureCanvas.width = 384;
-captureCanvas.height = 384;
+captureCanvas.width = 480;
+captureCanvas.height = 360;
 const captureCtx = captureCanvas.getContext("2d");
+let lastSendTime = 0;
 
 function sendFrameToBridge() {
-  if (!isBridgeConnected || !bridgeSocket || bridgeSocket.readyState !== WebSocket.OPEN || isFrameSending) {
+  if (!isBridgeConnected || !bridgeSocket || bridgeSocket.readyState !== WebSocket.OPEN) {
     return;
+  }
+  // 타임아웃 안전장치: 응답이 600ms 이상 지연되면 락 해제
+  if (isFrameSending) {
+    if (Date.now() - lastSendTime > 600) {
+      isFrameSending = false;
+    } else {
+      return;
+    }
   }
   if (!videoEl || videoEl.readyState < 2) return;
 
+  const vw = videoEl.videoWidth || 640;
+  const vh = videoEl.videoHeight || 480;
+  const targetW = 480;
+  const targetH = Math.round(targetW * (vh / vw)) || 360;
+  if (captureCanvas.width !== targetW || captureCanvas.height !== targetH) {
+    captureCanvas.width = targetW;
+    captureCanvas.height = targetH;
+  }
+
   isFrameSending = true;
+  lastSendTime = Date.now();
   captureCtx.drawImage(videoEl, 0, 0, captureCanvas.width, captureCanvas.height);
-  const dataUrl = captureCanvas.toDataURL("image/jpeg", 0.6);
+  const dataUrl = captureCanvas.toDataURL("image/jpeg", 0.65);
   try {
     bridgeSocket.send(JSON.stringify({
       model: currentModelType,
@@ -127,6 +146,11 @@ if (modelSelectEl) {
   modelSelectEl.addEventListener("change", (e) => {
     currentModelType = e.target.value;
     updateModelBadge(currentModelType);
+    externalModelResults = { landmarks: [], handedness: [] };
+    isFrameSending = false;
+    if (currentModelType !== "mediapipe") {
+      sendFrameToBridge();
+    }
   });
 }
 
@@ -144,13 +168,17 @@ const FINGERS = {
 };
 
 function isFingerExtended(landmarks, name) {
+  if (!landmarks || landmarks.length < 21) return false;
   const { pip, tip } = FINGERS[name];
+  if (!landmarks[tip] || !landmarks[pip]) return false;
   return landmarks[tip].y < landmarks[pip].y;
 }
 
 function isThumbExtended(landmarks, handedness) {
+  if (!landmarks || landmarks.length < 5) return false;
   const thumbTip = landmarks[4];
   const thumbIp = landmarks[3];
+  if (!thumbTip || !thumbIp || typeof thumbTip.x === "undefined" || typeof thumbIp.x === "undefined") return false;
 
   if (handedness === "Right") {
     return thumbTip.x > thumbIp.x;
@@ -160,12 +188,15 @@ function isThumbExtended(landmarks, handedness) {
 }
 
 function getChordQuality(landmarks) {
+  if (!landmarks || landmarks.length < 10) return "major";
   const wrist = landmarks[0];
   const middleMcp = landmarks[9]; // middle finger MCP joint
+  if (!wrist || !middleMcp || typeof wrist.x === "undefined" || typeof middleMcp.x === "undefined") return "major";
   return middleMcp.x > wrist.x ? "minor" : "major";
 }
 
 function classifyChord(landmarks, handedness) {
+  if (!landmarks || landmarks.length < 21) return null;
   const thumb = isThumbExtended(landmarks, handedness);
   const index = isFingerExtended(landmarks, "index");
   const middle = isFingerExtended(landmarks, "middle");
@@ -415,6 +446,9 @@ function stabilizeChordState(rawState, now) {
 
 // ---- Right hand: volume from height ----
 function getVolumeFromHeight(landmarks) {
+  if (!landmarks || landmarks.length === 0 || !landmarks[0] || typeof landmarks[0].y === "undefined") {
+    return 0;
+  }
   const wrist = landmarks[0];
   const TOP = 0.05;
   const BOTTOM = 0.95;
@@ -434,6 +468,7 @@ function updateVolumeMeter(volume01) {
 
 // ---- Right hand: quality (1-4 fingers = major, minor, dominant, diminished) ----
 function getRightHandQualityIndex(landmarks) {
+  if (!landmarks || landmarks.length < 21) return 0;
   const index = isFingerExtended(landmarks, "index");
   const middle = isFingerExtended(landmarks, "middle");
   const ring = isFingerExtended(landmarks, "ring");
@@ -445,35 +480,82 @@ function getRightHandQualityIndex(landmarks) {
 
 // ---- Camera setup ----
 async function setupCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: 640, height: 480 },
-    audio: false,
-  });
-  videoEl.srcObject = stream;
-  return new Promise((resolve) => {
-    videoEl.onloadedmetadata = () => {
-      videoEl.play();
-      resolve();
-    };
-  });
+  try {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+    } catch (e) {
+      console.warn("[Camera] ideal 해상도 실패, 기본 video: true로 재시도:", e);
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+    }
+
+    videoEl.srcObject = stream;
+    await new Promise((resolve) => {
+      if (videoEl.readyState >= 2) {
+        videoEl.play().catch(() => {});
+        resolve();
+        return;
+      }
+      videoEl.onloadedmetadata = () => {
+        videoEl.play().catch(() => {});
+        resolve();
+      };
+      // 1.5초 안전 타임아웃
+      setTimeout(() => {
+        videoEl.play().catch(() => {});
+        resolve();
+      }, 1500);
+    });
+    console.log("[Camera] 웹캠 연결 성공 (해상도:", videoEl.videoWidth, "x", videoEl.videoHeight, ")");
+  } catch (err) {
+    console.error("[Camera] 웹캠 연결 실패:", err);
+    alert(
+      "카메라를 연결할 수 없습니다.\n\n" +
+      "1. 다른 프로그램(줌, 디스코드, 웹 브라우저 등)이 카메라를 사용 중인지 확인해 주세요.\n" +
+      "2. 윈도우 설정 > 개인 정보 및 보안 > 카메라에서 '앱에서 카메라에 액세스하도록 허용'이 켜져 있는지 확인해 주세요.\n\n" +
+      "오류 내용: " + (err.message || err.name)
+    );
+  }
 }
-
-
 
 // ---- MediaPipe setup ----
 async function setupHandLandmarker() {
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-  );
-  return HandLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-      delegate: "GPU",
-    },
-    runningMode: "VIDEO",
-    numHands: 2,
-  });
+  try {
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+    try {
+      return await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        numHands: 2,
+      });
+    } catch (gpuErr) {
+      console.warn("[MediaPipe] GPU 가속 실패, CPU 모드로 전환 시도:", gpuErr);
+      return await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "CPU",
+        },
+        runningMode: "VIDEO",
+        numHands: 2,
+      });
+    }
+  } catch (err) {
+    console.error("[MediaPipe] 모델 로드 실패 (오프라인 상태이거나 네트워크 차단):", err);
+    return null;
+  }
 }
 
 // ADD THIS
@@ -864,6 +946,22 @@ function computeCoverRect(srcW, srcH, dstW, dstH) {
   }
 }
 
+// Hand skeleton joint connections (standard MediaPipe topology)
+const HAND_CONNECTIONS = [
+  // Thumb
+  [0, 1], [1, 2], [2, 3], [3, 4],
+  // Index
+  [0, 5], [5, 6], [6, 7], [7, 8],
+  // Middle
+  [0, 9], [9, 10], [10, 11], [11, 12],
+  // Ring
+  [0, 13], [13, 14], [14, 15], [15, 16],
+  // Pinky
+  [0, 17], [17, 18], [18, 19], [19, 20],
+  // Palm base
+  [5, 9], [9, 13], [13, 17], [0, 17]
+];
+
 function drawFrame(results, canvasWidth, canvasHeight) {
   const srcW = videoEl.videoWidth;
   const srcH = videoEl.videoHeight;
@@ -878,24 +976,93 @@ function drawFrame(results, canvasWidth, canvasHeight) {
 
   ctx.drawImage(videoEl, sx, sy, sWidth, sHeight, 0, 0, canvasWidth, canvasHeight);
 
-  for (const landmarks of results.landmarks) {
-    for (const point of landmarks) {
-      const videoPx = point.x * srcW;
-      const videoPy = point.y * srcH;
-      const canvasX = ((videoPx - sx) / sWidth) * canvasWidth;
-      const canvasY = ((videoPy - sy) / sHeight) * canvasHeight;
+  if (results && Array.isArray(results.landmarks)) {
+    for (let hIdx = 0; hIdx < results.landmarks.length; hIdx++) {
+      const landmarks = results.landmarks[hIdx];
+      if (!Array.isArray(landmarks) || landmarks.length < 21) continue;
 
-      // Outer glow
-      ctx.beginPath();
-      ctx.arc(canvasX, canvasY, 6, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0, 245, 212, 0.4)";
-      ctx.fill();
+      const handInfo = results.handedness && results.handedness[hIdx] ? results.handedness[hIdx][0] : null;
+      const handedness = handInfo ? handInfo.categoryName : (hIdx === 0 ? "Left" : "Right");
+      const isLeft = handedness === "Left";
 
-      // Center core
-      ctx.beginPath();
-      ctx.arc(canvasX, canvasY, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
+      const strokeColor = isLeft ? "rgba(0, 245, 212, 0.65)" : "rgba(167, 139, 250, 0.65)";
+      const glowColor = isLeft ? "rgba(0, 245, 212, 0.45)" : "rgba(167, 139, 250, 0.45)";
+      const labelText = isLeft ? "왼손 (코드 화음)" : "오른손 (볼륨/필터)";
+
+      // 1. 관절 연결선 (본 스켈레톤) 그리기
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      for (const [startIdx, endIdx] of HAND_CONNECTIONS) {
+        const p1 = landmarks[startIdx];
+        const p2 = landmarks[endIdx];
+        if (!p1 || !p2 || typeof p1.x === "undefined" || typeof p2.x === "undefined") continue;
+
+        const x1 = (((p1.x * srcW) - sx) / sWidth) * canvasWidth;
+        const y1 = (((p1.y * srcH) - sy) / sHeight) * canvasHeight;
+        const x2 = (((p2.x * srcW) - sx) / sWidth) * canvasWidth;
+        const y2 = (((p2.y * srcH) - sy) / sHeight) * canvasHeight;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      // 2. 21개 관절 노드 그리기
+      for (const point of landmarks) {
+        if (!point || typeof point.x === "undefined" || typeof point.y === "undefined") continue;
+        const videoPx = point.x * srcW;
+        const videoPy = point.y * srcH;
+        const canvasX = ((videoPx - sx) / sWidth) * canvasWidth;
+        const canvasY = ((videoPy - sy) / sHeight) * canvasHeight;
+
+        // Outer glow
+        ctx.beginPath();
+        ctx.arc(canvasX, canvasY, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = glowColor;
+        ctx.fill();
+
+        // Center core
+        ctx.beginPath();
+        ctx.arc(canvasX, canvasY, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+      }
+
+      // 3. 손목 위 손 라벨 배지 렌더링
+      const wrist = landmarks[0];
+      if (wrist && typeof wrist.x !== "undefined") {
+        const wx = (((wrist.x * srcW) - sx) / sWidth) * canvasWidth;
+        const wy = (((wrist.y * srcH) - sy) / sHeight) * canvasHeight;
+
+        ctx.save();
+        // 거울 반전 보정하여 텍스트 정방향 출력
+        ctx.translate(wx, wy + 26);
+        ctx.scale(-1, 1);
+
+        ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+        const textWidth = ctx.measureText(labelText).width;
+        const padX = 8;
+        const padY = 4;
+
+        ctx.fillStyle = "rgba(12, 15, 20, 0.75)";
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(-textWidth / 2 - padX, -10 - padY, textWidth + padX * 2, 20 + padY, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = isLeft ? "#00f5d4" : "#a78bfa";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(labelText, 0, 0);
+
+        ctx.restore();
+      }
     }
   }
   ctx.restore();
@@ -912,7 +1079,15 @@ async function main() {
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
 
-  const handLandmarker = await setupHandLandmarker();
+  let handLandmarker = null;
+  setupHandLandmarker().then((hl) => {
+    handLandmarker = hl;
+    if (hl) {
+      console.log("[MediaPipe] 핸드 랜드마커 준비 완료");
+    } else {
+      console.warn("[MediaPipe] 로드 실패. 상단에서 Intel Geti 또는 YOLOv8 모델을 선택해 주세요.");
+    }
+  });
 
   let lastVideoTime = -1;
   
@@ -922,6 +1097,7 @@ async function main() {
 
   function loop() {
   const timestampNow = performance.now();
+  try {
 
   // ============================
   // 1. UPDATE MEDIAPIPE FRAME
@@ -934,7 +1110,9 @@ async function main() {
 
     if (currentModelType === "mediapipe") {
       // ★ 1. Google MediaPipe (기본/고정밀 - 원본 로직 100% 보존)
-      results = handLandmarker.detectForVideo(videoEl, timestampNow);
+      if (handLandmarker) {
+        results = handLandmarker.detectForVideo(videoEl, timestampNow);
+      }
     } else {
       // 🧪 2. Intel Geti (OpenVINO) / 커스텀 ONNX 모델 결과 주입
       sendFrameToBridge();
@@ -950,8 +1128,9 @@ async function main() {
     cachedLeftLandmarks = null;
     cachedRightLandmarks = null;
 
-    if (results && results.landmarks) {
+    if (results && Array.isArray(results.landmarks)) {
       results.landmarks.forEach((landmarks, i) => {
+        if (!landmarks || !Array.isArray(landmarks) || landmarks.length < 21) return;
         const handInfo = results.handedness && results.handedness[i] ? results.handedness[i][0] : null;
         const handedness = handInfo ? handInfo.categoryName : (i === 0 ? "Left" : "Right");
 
@@ -1254,16 +1433,22 @@ if (rawChord) {
       : 0;
 
 
-  drawEnergy(
-    ctx,
-    volume,
-    qualityIndex,
-    tilt,
-    currentChord
-  );
-
-
-  requestAnimationFrame(loop);
+    try {
+      drawEnergy(
+        ctx,
+        volume,
+        qualityIndex,
+        tilt,
+        currentChord
+      );
+    } catch (e) {
+      console.error("[Energy Visualizer Error]", e);
+    }
+  } catch (loopErr) {
+    console.error("[Loop Execution Error]", loopErr);
+  } finally {
+    requestAnimationFrame(loop);
+  }
 }
   
   loop();
